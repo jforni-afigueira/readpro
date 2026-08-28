@@ -1,0 +1,10 @@
+{
+  "name": "ReadPro",
+  "description": "Um leitor acessível (PDF/EPUB) com Text-to-Speech (TTS), ajuste de tom (pitch), seleção de vozes masculinas/femininas, histórico automático de leitura persistente e sistema de marcadores (bookmarks).",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    <title>ReadPro</title>
+    <meta name="description" content="Um leitor acessível (PDF/EPUB) com Text-to-Speech (TTS), ajuste de tom (pitch), seleção de vozes masculinas/femininas, histórico automático de leitura persistente e sistema de marcadores (bookmarks)." />
+    <meta property="og:title" content="ReadPro" />
+    <meta property="og:description" content="Um leitor acessível (PDF/EPUB) com Text-to-Speech (TTS), ajuste de tom (pitch), seleção de vozes masculinas/femininas, histórico automático de leitura persistente e sistema de marcadores (bookmarks)." />
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+      if (typeof window.pdfjsLib !== 'undefined') {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    </script>
+    <!-- PDF.js Viewer CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
+
+    <style>
+      html, body {
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      /* Hide scrollbars across the whole document while allowing full scroll interaction */
+      * {
+        scrollbar-width: none !important; /* Firefox */
+        -ms-overflow-style: none !important; /* IE and Edge */
+      }
+      *::-webkit-scrollbar {
+        display: none !important; /* Chrome, Safari, WebKit */
+        width: 0px !important;
+        height: 0px !important;
+        background: transparent !important;
+      }
+      
+      /* PDF Container Overrides */
+      #pdf-wrapper {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: #525659;
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      
+      .page {
+        position: relative;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+
+      .textLayer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        overflow: hidden;
+        opacity: 1; /* Keep at 1, individual spans handle opacity */
+        line-height: 1.0;
+      }
+
+      .textLayer span {
+        color: transparent;
+        cursor: text;
+      }
+      
+      .textLayer ::selection {
+        background: rgba(0, 0, 255, 0.2);
+        color: transparent;
+      }
+
+      /* EPub specific */
+      #epub-frame {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: white;
+      }
+
+      /* Custom Accessible Range Sliders */
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: transparent;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 8px;
+        border-radius: 9999px;
+      }
+      input[type="range"]::-moz-range-track {
+        height: 8px;
+        border-radius: 9999px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: #3b82f6;
+        cursor: pointer;
+        margin-top: -4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        border: 2px solid white;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background-color: #3b82f6;
+        cursor: pointer;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        border: 2px solid white;
+      }
+    </style>
+</head>
+  <body class="bg-slate-50 text-slate-900 antialiased">
+    <div id="root" class="h-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
