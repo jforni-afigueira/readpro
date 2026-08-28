@@ -667,6 +667,55 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                 {isListening ? <Mic size={16} /> : <MicOff size={16} />}
               </button>
             )}
+            {/* Desktop Zoom Controls (Simple Zoom In / Out / Percent) */}
+            <div className={`hidden md:flex items-center gap-1 p-1 rounded-lg border ${
+              theme === 'dark' ? 'bg-slate-800/50 border-slate-700/80' : 'bg-slate-100 border-slate-200'
+            }`}>
+              <button
+                type="button"
+                onClick={onZoomOut}
+                className={`p-1 rounded-md transition active:scale-95 ${
+                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                }`}
+                title="Diminuir Zoom (PDF)"
+                aria-label="Diminuir zoom"
+              >
+                <ZoomOut size={15} />
+              </button>
+              
+              <span className="font-mono text-[11px] font-bold px-1 min-w-[38px] text-center" title="Zoom atual">
+                {Math.round(scale * 100)}%
+              </span>
+              
+              <button
+                type="button"
+                onClick={onZoomIn}
+                className={`p-1 rounded-md transition active:scale-95 ${
+                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                }`}
+                title="Aumentar Zoom (PDF)"
+                aria-label="Aumentar zoom"
+              >
+                <ZoomIn size={15} />
+              </button>
+              
+              {onFitScreen && (
+                <>
+                  <div className={`w-px h-4 self-center mx-0.5 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                  <button
+                    type="button"
+                    onClick={onFitScreen}
+                    className={`p-1 rounded-md transition active:scale-95 ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-blue-400' : 'hover:bg-slate-200 text-blue-600'
+                    }`}
+                    title="Ajustar Zoom à Tela"
+                    aria-label="Ajustar zoom à tela"
+                  >
+                    <Monitor size={14} />
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Fullscreen Toggle */}
             <button
