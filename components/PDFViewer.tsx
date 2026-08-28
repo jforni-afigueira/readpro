@@ -35,6 +35,23 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   
   const isRenderingRef = useRef(false);
   
+  // Touch gesture zoom and pan states for mobile
+  const [localScale, setLocalScale] = useState(1);
+  const [localTranslate, setLocalTranslate] = useState({ x: 0, y: 0 });
+  const [isGestureActive, setIsGestureActive] = useState(false);
+
+  const touchStateRef = useRef({
+    scale: 1,
+    translate: { x: 0, y: 0 },
+    startX: 0,
+    startY: 0,
+    startDist: 0,
+    startScale: 1,
+    startTranslate: { x: 0, y: 0 },
+    isPinching: false,
+    isPanning: false
+  });
+  
   // Logic Control Refs
   const autoPlayPageRef = useRef<number | null>(null);
   const onPageChangeRef = useRef(onPageChange);
@@ -323,6 +340,122 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     }
   }, [tts.currentGlobalIndex, lineRegions, textMap]);
 
+  // Reset local zoom/pan when scale prop changes from control bar
+  useEffect(() => {
+    const state = touchStateRef.current;
+    state.scale = 1;
+    state.translate = { x: 0, y: 0 };
+    setLocalScale(1);
+    setLocalTranslate({ x: 0, y: 0 });
+  }, [scale]);
+
+  // Touch Gestures for mobile zoom and pan
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const state = touchStateRef.current;
+    
+    if (e.touches.length === 1) {
+      // Single touch = Panning
+      const touch = e.touches[0];
+      state.startX = touch.clientX;
+      state.startY = touch.clientY;
+      state.startTranslate = { ...state.translate };
+      state.isPanning = true;
+      state.isPinching = false;
+    } else if (e.touches.length === 2) {
+      // Two touches = Pinching (+ optional panning)
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      
+      const dx = touch1.clientX - touch2.clientX;
+      const dy = touch1.clientY - touch2.clientY;
+      state.startDist = Math.sqrt(dx * dx + dy * dy);
+      
+      state.startScale = state.scale;
+      state.startX = (touch1.clientX + touch2.clientX) / 2;
+      state.startY = (touch1.clientY + touch2.clientY) / 2;
+      state.startTranslate = { ...state.translate };
+      
+      state.isPinching = true;
+      state.isPanning = false;
+    }
+    
+    setIsGestureActive(true);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const state = touchStateRef.current;
+    if (!state.isPanning && !state.isPinching) return;
+    
+    if (state.isPanning && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - state.startX;
+      const dy = touch.clientY - state.startY;
+      
+      if (state.scale > 1) {
+        if (e.cancelable) e.preventDefault();
+      }
+      
+      state.translate = {
+        x: state.startTranslate.x + dx / state.scale,
+        y: state.startTranslate.y + dy / state.scale
+      };
+      
+      setLocalTranslate({ ...state.translate });
+    } else if (state.isPinching && e.touches.length === 2) {
+      if (e.cancelable) e.preventDefault();
+      
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      
+      const dx = touch1.clientX - touch2.clientX;
+      const dy = touch1.clientY - touch2.clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (state.startDist > 0) {
+        const scaleFactor = dist / state.startDist;
+        const newScale = Math.max(0.75, Math.min(state.startScale * scaleFactor, 4.0));
+        state.scale = newScale;
+        setLocalScale(newScale);
+        
+        const centerX = (touch1.clientX + touch2.clientX) / 2;
+        const centerY = (touch1.clientY + touch2.clientY) / 2;
+        const panX = centerX - state.startX;
+        const panY = centerY - state.startY;
+        
+        state.translate = {
+          x: state.startTranslate.x + panX / newScale,
+          y: state.startTranslate.y + panY / newScale
+        };
+        setLocalTranslate({ ...state.translate });
+      }
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const state = touchStateRef.current;
+    state.isPanning = false;
+    state.isPinching = false;
+    setIsGestureActive(false);
+  }, []);
+
+  const lastTapRef = useRef<number>(0);
+  const handleTouchStartWithDoubleTap = useCallback((e: React.TouchEvent) => {
+    const state = touchStateRef.current;
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap to reset
+      state.scale = 1;
+      state.translate = { x: 0, y: 0 };
+      setLocalScale(1);
+      setLocalTranslate({ x: 0, y: 0 });
+      setIsGestureActive(false);
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+      handleTouchStart(e);
+    }
+  }, [handleTouchStart]);
+
   return (
     <div className={`w-full flex justify-center py-8 min-h-[calc(100vh-8rem)] overflow-visible transition-colors duration-200 ${
       theme === 'dark' ? 'bg-[#0f1115]' : theme === 'sepia' ? 'bg-[#ede0c8]' : 'bg-slate-100'
@@ -338,7 +471,17 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       `}</style>
       <div 
         ref={containerRef} 
-        style={{ '--scale-factor': scale } as React.CSSProperties}
+        style={{ 
+          '--scale-factor': scale,
+          transform: `scale(${localScale}) translate(${localTranslate.x}px, ${localTranslate.y}px)`,
+          transformOrigin: 'center center',
+          transition: isGestureActive ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          touchAction: localScale > 1 ? 'none' : 'pan-y',
+          cursor: isGestureActive ? 'grabbing' : 'grab'
+        } as React.CSSProperties}
+        onTouchStart={handleTouchStartWithDoubleTap}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       />
       {/* Data bridge for App.tsx */}
       <div id="pdf-data-bridge" data-text={pageText} className="hidden"></div>

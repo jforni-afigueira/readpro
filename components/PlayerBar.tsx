@@ -509,7 +509,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
           />
         </div>
 
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 overflow-x-auto flex-nowrap touch-pan-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
           {/* SECTION 1: Open Document, History & Page Navigator */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
