@@ -702,40 +702,48 @@ export const EpubViewer: React.FC<EpubViewerProps> = ({
           </div>
 
           {/* Chapter Quick Pagination Buttons */}
-          <div className="w-full flex items-center justify-between mt-4 px-2 text-xs">
-            <button
-              onClick={handlePrevChapter}
-              disabled={currentPage <= 1}
-              className={`px-4 py-2 rounded-xl font-medium shadow-2xs flex items-center gap-1.5 transition active:scale-95 border disabled:opacity-30 ${
-                theme === 'dark'
-                  ? 'bg-[#1e222b] border-[#2e3442] text-slate-300 hover:bg-[#282e3c]'
-                  : theme === 'sepia'
-                  ? 'bg-[#f8eed7] border-[#e2d3bb] text-[#4a3928] hover:bg-[#f2e4c8]'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <ChevronLeft size={16} />
-              <span>Capítulo Anterior</span>
-            </button>
+          <div className="w-full grid grid-cols-3 items-center mt-4 px-2 text-xs">
+            <div className="justify-self-start">
+              <button
+                onClick={handlePrevChapter}
+                disabled={currentPage <= 1}
+                className={`px-3 py-2 rounded-xl font-medium shadow-2xs flex items-center gap-1 transition active:scale-95 border disabled:opacity-30 ${
+                  theme === 'dark'
+                    ? 'bg-[#1e222b] border-[#2e3442] text-slate-300 hover:bg-[#282e3c]'
+                    : theme === 'sepia'
+                    ? 'bg-[#f8eed7] border-[#e2d3bb] text-[#4a3928] hover:bg-[#f2e4c8]'
+                    : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                }`}
+              >
+                <ChevronLeft size={16} />
+                <span className="hidden sm:inline">Capítulo Anterior</span>
+                <span className="sm:hidden">Anterior</span>
+              </button>
+            </div>
 
-            <span className="font-mono opacity-60">
+            <div className={`justify-self-center text-center font-mono opacity-80 font-bold px-2.5 py-1.5 rounded-lg border border-transparent ${
+              theme === 'dark' ? 'text-slate-200' : theme === 'sepia' ? 'text-[#4a3928]' : 'text-slate-700'
+            }`}>
               {currentPage} de {chapters.length}
-            </span>
+            </div>
 
-            <button
-              onClick={handleNextChapter}
-              disabled={currentPage >= chapters.length}
-              className={`px-4 py-2 rounded-xl font-medium shadow-2xs flex items-center gap-1.5 transition active:scale-95 border disabled:opacity-30 ${
-                theme === 'dark'
-                  ? 'bg-[#1e222b] border-[#2e3442] text-slate-300 hover:bg-[#282e3c]'
-                  : theme === 'sepia'
-                  ? 'bg-[#f8eed7] border-[#e2d3bb] text-[#4a3928] hover:bg-[#f2e4c8]'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <span>Próximo Capítulo</span>
-              <ChevronRight size={16} />
-            </button>
+            <div className="justify-self-end">
+              <button
+                onClick={handleNextChapter}
+                disabled={currentPage >= chapters.length}
+                className={`px-3 py-2 rounded-xl font-medium shadow-2xs flex items-center gap-1 transition active:scale-95 border disabled:opacity-30 ${
+                  theme === 'dark'
+                    ? 'bg-[#1e222b] border-[#2e3442] text-slate-300 hover:bg-[#282e3c]'
+                    : theme === 'sepia'
+                    ? 'bg-[#f8eed7] border-[#e2d3bb] text-[#4a3928] hover:bg-[#f2e4c8]'
+                    : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                }`}
+              >
+                <span className="hidden sm:inline">Próximo Capítulo</span>
+                <span className="sm:hidden">Próximo</span>
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
       )}

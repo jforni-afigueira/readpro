@@ -84,6 +84,8 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
 }) => {
   const [inputVal, setInputVal] = useState(currentPage.toString());
   const [showMobileSettings, setShowMobileSettings] = useState(false);
+  const isEpub = fileName.toLowerCase().endsWith('.epub');
+  const isPdf = fileName.toLowerCase().endsWith('.pdf');
 
   // Gesture & Drag state for pulling up / down
   const [dragOffset, setDragOffset] = useState(0);
@@ -507,10 +509,10 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
           />
         </div>
 
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
           {/* SECTION 1: Open Document, History & Page Navigator */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 min-w-0 max-w-[320px] sm:max-w-md">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             
             {/* Open / Upload Document Button */}
             <label 
@@ -592,7 +594,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
           {/* SECTION 3: Right Controls & Modular Theme/Speed Pickers */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Speed Slider */}
-            <div className="hidden lg:flex items-center">
+            <div className="flex items-center shrink-0">
               <SpeedSlider 
                 rate={tts.state.rate}
                 theme={theme}
@@ -621,7 +623,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
 
             {/* Compact Themes in Bar */}
             {onThemeChange && (
-              <div className="hidden sm:block">
+              <div className="flex shrink-0">
                 <ThemePicker theme={theme} onThemeChange={onThemeChange} compact={true} />
               </div>
             )}
@@ -667,61 +669,111 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
                 {isListening ? <Mic size={16} /> : <MicOff size={16} />}
               </button>
             )}
-            {/* Desktop Zoom Controls (Simple Zoom In / Out / Percent) */}
-            <div className={`hidden md:flex items-center gap-1 p-1 rounded-lg border ${
-              theme === 'dark' ? 'bg-slate-800/50 border-slate-700/80' : 'bg-slate-100 border-slate-200'
-            }`}>
-              <button
-                type="button"
-                onClick={onZoomOut}
-                className={`p-1 rounded-md transition active:scale-95 ${
-                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
-                }`}
-                title="Diminuir Zoom (PDF)"
-                aria-label="Diminuir zoom"
-              >
-                <ZoomOut size={15} />
-              </button>
-              
-              <span className="font-mono text-[11px] font-bold px-1 min-w-[38px] text-center" title="Zoom atual">
-                {Math.round(scale * 100)}%
-              </span>
-              
-              <button
-                type="button"
-                onClick={onZoomIn}
-                className={`p-1 rounded-md transition active:scale-95 ${
-                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
-                }`}
-                title="Aumentar Zoom (PDF)"
-                aria-label="Aumentar zoom"
-              >
-                <ZoomIn size={15} />
-              </button>
-              
-              {onFitScreen && (
-                <>
-                  <div className={`w-px h-4 self-center mx-0.5 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                  <button
-                    type="button"
-                    onClick={onFitScreen}
-                    className={`p-1 rounded-md transition active:scale-95 ${
-                      theme === 'dark' ? 'hover:bg-slate-700 text-blue-400' : 'hover:bg-slate-200 text-blue-600'
-                    }`}
-                    title="Ajustar Zoom à Tela"
-                    aria-label="Ajustar zoom à tela"
-                  >
-                    <Monitor size={14} />
-                  </button>
-                </>
-              )}
-            </div>
+            {/* Font Size Controls for EPUB */}
+            {isEpub && onFontSizeScaleChange && (
+              <div className={`flex items-center gap-1 p-1 rounded-lg border shrink-0 ${
+                theme === 'dark' ? 'bg-slate-800/50 border-slate-700/80' : 'bg-slate-100 border-slate-200'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => onFontSizeScaleChange(Math.max(0.75, fontSizeScale - 0.15))}
+                  className={`p-1 rounded-md transition active:scale-95 ${
+                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                  }`}
+                  title="Diminuir tamanho do texto"
+                  aria-label="Diminuir fonte"
+                >
+                  <ZoomOut size={15} />
+                </button>
+                
+                <span className="font-mono text-[11px] font-bold px-1 min-w-[38px] text-center" title="Tamanho da fonte">
+                  {Math.round(fontSizeScale * 105)}%
+                </span>
+                
+                <button
+                  type="button"
+                  onClick={() => onFontSizeScaleChange(Math.min(2.5, fontSizeScale + 0.15))}
+                  className={`p-1 rounded-md transition active:scale-95 ${
+                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                  }`}
+                  title="Aumentar tamanho do texto"
+                  aria-label="Aumentar fonte"
+                >
+                  <ZoomIn size={15} />
+                </button>
+                
+                <div className={`w-px h-4 self-center mx-0.5 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <button
+                  type="button"
+                  onClick={() => onFontSizeScaleChange(1.15)}
+                  className={`p-1 rounded-md transition active:scale-95 ${
+                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                  }`}
+                  title="Restaurar tamanho padrão"
+                  aria-label="Tamanho padrão"
+                >
+                  <RotateCcw size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Zoom Controls for PDF */}
+            {(!fileName || isPdf) && (
+              <div className={`flex items-center gap-1 p-1 rounded-lg border shrink-0 ${
+                theme === 'dark' ? 'bg-slate-800/50 border-slate-700/80' : 'bg-slate-100 border-slate-200'
+              }`}>
+                <button
+                  type="button"
+                  onClick={onZoomOut}
+                  className={`p-1 rounded-md transition active:scale-95 ${
+                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                  }`}
+                  title="Diminuir Zoom (PDF)"
+                  aria-label="Diminuir zoom"
+                >
+                  <ZoomOut size={15} />
+                </button>
+                
+                <span className="font-mono text-[11px] font-bold px-1 min-w-[38px] text-center" title="Zoom atual">
+                  {Math.round(scale * 100)}%
+                </span>
+                
+                <button
+                  type="button"
+                  onClick={onZoomIn}
+                  className={`p-1 rounded-md transition active:scale-95 ${
+                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-700'
+                  }`}
+                  title="Aumentar Zoom (PDF)"
+                  aria-label="Aumentar zoom"
+                >
+                  <ZoomIn size={15} />
+                </button>
+                
+                {onFitScreen && (
+                  <>
+                    <div className={`w-px h-4 self-center mx-0.5 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                    <button
+                      type="button"
+                      onClick={onFitScreen}
+                      className={`p-1 rounded-md transition active:scale-95 ${
+                        theme === 'dark' ? 'hover:bg-slate-700 text-blue-400' : 'hover:bg-slate-200 text-blue-600'
+                      }`}
+                      title="Ajustar Zoom à Tela"
+                      aria-label="Ajustar zoom à tela"
+                    >
+                      <Monitor size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Fullscreen Toggle */}
             <button
               type="button"
               onClick={onToggleFullScreen}
-              className={`p-1.5 rounded-lg transition border shadow-2xs active:scale-95 hidden sm:flex items-center justify-center ${
+              className={`p-1.5 rounded-lg transition border shadow-2xs active:scale-95 flex items-center justify-center shrink-0 ${
                 theme === 'dark'
                   ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
                   : theme === 'sepia'
@@ -753,11 +805,11 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
               </button>
             )}
 
-            {/* Mobile Settings Toggle */}
+            {/* Mobile Settings Toggle (Hidden as all controls are now directly on the bar) */}
             <button
               type="button"
               onClick={() => setShowMobileSettings(true)}
-              className={`p-1.5 rounded-lg transition border shadow-2xs active:scale-95 md:hidden ${
+              className={`p-1.5 rounded-lg transition border shadow-2xs active:scale-95 hidden ${
                 theme === 'dark'
                   ? 'bg-slate-800 text-slate-300 border-slate-700'
                   : theme === 'sepia'
