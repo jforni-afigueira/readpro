@@ -60,6 +60,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   const numPagesRef = useRef(numPages);
   
   const lastScrolledElementRef = useRef<HTMLElement | null>(null);
+  const lastPageRef = useRef<number | null>(null);
+  
+  useEffect(() => {
+    lastPageRef.current = null;
+  }, [file]);
   
   useEffect(() => {
     onPageChangeRef.current = onPageChange;
@@ -113,6 +118,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     const isAutoPlayAdvance = autoPlayPageRef.current === currentPage;
     const isManualOrExisting = tts.state.isPlaying;
     const shouldPlay = isAutoPlayAdvance || isManualOrExisting;
+    
+    const pageChanged = lastPageRef.current !== currentPage;
 
     let isCancelled = false;
 
@@ -121,8 +128,10 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       isRenderingRef.current = true;
 
       try {
-        if (tts.state.isPlaying && !isAutoPlayAdvance) {
-          tts.stop();
+        if (pageChanged) {
+          if (tts.state.isPlaying && !isAutoPlayAdvance) {
+            tts.stop();
+          }
         }
 
         const page = await pdfDoc.getPage(currentPage);
@@ -300,7 +309,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         });
         
         // Trigger Autoplay
-        if (shouldPlay) {
+        if (shouldPlay && pageChanged) {
            setTimeout(() => {
              if (currentPage === currentPageRef.current && !isCancelled) {
                 if (autoPlayPageRef.current === currentPage) {
@@ -311,6 +320,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
              }
            }, 100);
         }
+
+        lastPageRef.current = currentPage;
 
       } catch (err) {
         console.error("Page render error:", err);

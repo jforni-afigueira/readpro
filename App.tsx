@@ -77,6 +77,7 @@ const App: React.FC = () => {
   const historyToastTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastTouchTimeRef = useRef(0);
+  const lastTouchStartNavigatedTimeRef = useRef(0);
 
   const tts = useSmartTTS();
 
@@ -216,6 +217,11 @@ const App: React.FC = () => {
   }, [totalPages]);
 
   const handleGlobalDoubleClick = useCallback((e: React.MouseEvent) => {
+    // Prevent mouse double clicks synthesized from double taps on mobile
+    if (Date.now() - lastTouchStartNavigatedTimeRef.current < 1000) {
+      return;
+    }
+
     const target = e.target as HTMLElement;
     if (
       target.closest('button') || 
@@ -269,10 +275,12 @@ const App: React.FC = () => {
       
       if (clickX < sideWidth) {
         if (e.cancelable) e.preventDefault();
+        lastTouchStartNavigatedTimeRef.current = Date.now();
         handlePageJump(currentPage - 1);
         showToast("Página Anterior");
       } else if (clickX > screenWidth - sideWidth) {
         if (e.cancelable) e.preventDefault();
+        lastTouchStartNavigatedTimeRef.current = Date.now();
         handlePageJump(currentPage + 1);
         showToast("Próxima Página");
       }
