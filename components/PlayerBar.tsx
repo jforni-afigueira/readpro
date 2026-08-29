@@ -584,8 +584,8 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({
               theme={theme}
               onPlayPause={onTogglePlay}
               onStop={tts.stop}
-              onPrevious={tts.previous}
-              onNext={tts.next}
+              onPrevious={() => tts.skipParagraph('prev')}
+              onNext={() => tts.skipParagraph('next')}
               hasPrevious={tts.currentGlobalIndex > 0}
               hasNext={tts.totalLength > 0 && tts.currentGlobalIndex < tts.totalLength - 1}
             />
