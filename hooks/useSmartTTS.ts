@@ -325,21 +325,21 @@ export function useSmartTTS() {
 
     activeUtteranceKeeper.add(u);
 
-    // Cancel existing & unpause to ensure engine is clear
-    synth.current.cancel();
     if (synth.current.paused) {
       synth.current.resume();
     }
 
-    setTimeout(() => {
-      if (synth.current && isPlayingRef.current) {
-        synth.current.speak(u);
-      }
-    }, 15);
+    if (synth.current && isPlayingRef.current) {
+      synth.current.speak(u);
+    }
   }, [stopFallbackTimer, stop, state.volume]);
 
   const play = useCallback((text: string, startOffset = 0, onComplete?: () => void) => {
     if (!text || !text.trim()) return;
+
+    if (synth.current) {
+      synth.current.cancel();
+    }
 
     fullTextRef.current = text;
     onCompleteRef.current = onComplete;
