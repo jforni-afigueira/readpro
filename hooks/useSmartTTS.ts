@@ -234,102 +234,94 @@ export function useSmartTTS() {
     setState(s => ({ ...s, isPlaying: false, isPaused: false }));
   }, [stopFallbackTimer]);
 
-  // Play next chunk in sequence
-  const playCurrentChunk = useCallback(() => {
-    stopFallbackTimer();
-
+  // Queue all chunks starting from target index
+  const queueChunks = useCallback((startIndex: number) => {
     if (!synth.current) return;
+    
+    stopFallbackTimer();
+    activeUtteranceKeeper.clear();
+    
     const chunks = chunksRef.current;
-    const chunkIdx = currentChunkIndexRef.current;
-
-    if (chunkIdx >= chunks.length || !isPlayingRef.current) {
-      // Reached the end of text
-      stop();
-      if (onCompleteRef.current) {
-        onCompleteRef.current();
-      }
-      return;
-    }
-
-    const chunk = chunks[chunkIdx];
-    const chunkText = chunk.text.trim();
-
-    if (!chunkText) {
-      // Skip empty whitespace chunk
-      currentChunkIndexRef.current++;
-      playCurrentChunk();
-      return;
-    }
-
-    // Set initial position
-    setCurrentGlobalIndex(chunk.start);
-    boundaryFiredRecentlyRef.current = false;
-    chunkStartTimeRef.current = Date.now();
-
-    // Utterance preparation
-    const u = new SpeechSynthesisUtterance(chunk.text);
-    u.rate = rateRef.current;
-    u.pitch = pitchRef.current;
-    u.volume = state.volume ?? 1.0;
-    u.lang = 'pt-BR';
-
-    if (voiceURIRef.current) {
-      const allVoices = synth.current.getVoices();
-      const matchedVoice = allVoices.find(v => v.voiceURI === voiceURIRef.current);
-      if (matchedVoice) {
-        u.voice = matchedVoice;
-        u.lang = matchedVoice.lang || 'pt-BR';
-      }
-    }
-
-    // 1. Boundary event handler (exact word position)
-    u.onboundary = (e) => {
-      boundaryFiredRecentlyRef.current = true;
-      const calculatedIndex = chunk.start + e.charIndex;
-      setCurrentGlobalIndex(calculatedIndex);
-    };
-
-    // 2. Fallback timer for browsers/voices that don't emit onboundary
-    fallbackTimerRef.current = setInterval(() => {
-      if (!isPlayingRef.current || isPausedRef.current) return;
-      if (!boundaryFiredRecentlyRef.current) {
-        const elapsedSec = (Date.now() - chunkStartTimeRef.current) / 1000;
-        // Average speaking speed: ~15 chars/sec * rate
-        const estimatedChars = Math.floor(elapsedSec * 16 * rateRef.current);
-        const interpolatedIndex = Math.min(chunk.end, chunk.start + estimatedChars);
-        setCurrentGlobalIndex(interpolatedIndex);
-      }
-    }, 120);
-
-    // 3. Chunk completion
-    u.onend = () => {
-      stopFallbackTimer();
-      activeUtteranceKeeper.delete(u);
-      if (isPlayingRef.current) {
-        currentChunkIndexRef.current++;
-        playCurrentChunk();
-      }
-    };
-
-    u.onerror = (e) => {
-      stopFallbackTimer();
-      activeUtteranceKeeper.delete(u);
-      if (e.error !== 'canceled' && e.error !== 'interrupted') {
-        console.warn('SpeechSynthesis error:', e.error);
-        if (isPlayingRef.current) {
-          currentChunkIndexRef.current++;
-          playCurrentChunk();
-        }
-      }
-    };
-
-    activeUtteranceKeeper.add(u);
-
+    
+    // Resume if paused to make sure queue plays
     if (synth.current.paused) {
       synth.current.resume();
     }
-
-    if (synth.current && isPlayingRef.current) {
+    
+    for (let i = startIndex; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const chunkText = chunk.text.trim();
+      if (!chunkText) continue;
+      
+      const u = new SpeechSynthesisUtterance(chunk.text);
+      u.rate = rateRef.current;
+      u.pitch = pitchRef.current;
+      u.volume = state.volume ?? 1.0;
+      u.lang = 'pt-BR';
+      
+      if (voiceURIRef.current) {
+        const allVoices = synth.current.getVoices();
+        const matchedVoice = allVoices.find(v => v.voiceURI === voiceURIRef.current);
+        if (matchedVoice) {
+          u.voice = matchedVoice;
+          u.lang = matchedVoice.lang || 'pt-BR';
+        }
+      }
+      
+      // Bind index i via closure
+      u.onstart = () => {
+        currentChunkIndexRef.current = i;
+        setCurrentGlobalIndex(chunk.start);
+        boundaryFiredRecentlyRef.current = false;
+        chunkStartTimeRef.current = Date.now();
+        
+        // Start fallback interpolation timer for this specific chunk
+        stopFallbackTimer();
+        fallbackTimerRef.current = setInterval(() => {
+          if (!isPlayingRef.current || isPausedRef.current) return;
+          if (!boundaryFiredRecentlyRef.current) {
+            const elapsedSec = (Date.now() - chunkStartTimeRef.current) / 1000;
+            const estimatedChars = Math.floor(elapsedSec * 16 * rateRef.current);
+            const interpolatedIndex = Math.min(chunk.end, chunk.start + estimatedChars);
+            setCurrentGlobalIndex(interpolatedIndex);
+          }
+        }, 120);
+      };
+      
+      u.onboundary = (e) => {
+        boundaryFiredRecentlyRef.current = true;
+        const calculatedIndex = chunk.start + e.charIndex;
+        setCurrentGlobalIndex(calculatedIndex);
+      };
+      
+      u.onend = () => {
+        stopFallbackTimer();
+        activeUtteranceKeeper.delete(u);
+        
+        // If this is the last chunk, call onComplete
+        if (i === chunks.length - 1) {
+          stop();
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+          }
+        }
+      };
+      
+      u.onerror = (e) => {
+        stopFallbackTimer();
+        activeUtteranceKeeper.delete(u);
+        if (e.error !== 'canceled' && e.error !== 'interrupted') {
+          console.warn('SpeechSynthesis error in queued chunk:', e.error);
+          if (i === chunks.length - 1) {
+            stop();
+            if (onCompleteRef.current) {
+              onCompleteRef.current();
+            }
+          }
+        }
+      };
+      
+      activeUtteranceKeeper.add(u);
       synth.current.speak(u);
     }
   }, [stopFallbackTimer, stop, state.volume]);
@@ -372,8 +364,8 @@ export function useSmartTTS() {
     currentChunkIndexRef.current = targetChunkIndex;
     setCurrentGlobalIndex(startOffset);
 
-    playCurrentChunk();
-  }, [playCurrentChunk]);
+    queueChunks(targetChunkIndex);
+  }, [queueChunks]);
 
   const pause = useCallback(() => {
     stopFallbackTimer();
@@ -393,9 +385,9 @@ export function useSmartTTS() {
       isPausedRef.current = false;
       isPlayingRef.current = true;
       setState(s => ({ ...s, isPlaying: true, isPaused: false }));
-      playCurrentChunk();
+      queueChunks(currentChunkIndexRef.current);
     }
-  }, [playCurrentChunk]);
+  }, [queueChunks]);
 
   const skip = useCallback((charOffset: number) => {
     if (!fullTextRef.current) return;
