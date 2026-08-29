@@ -227,107 +227,17 @@ export function useSmartTTS() {
       synth.current.cancel();
     }
     activeUtteranceKeeper.clear();
-    currentChunkIndexRef.current = 0;
     isPlayingRef.current = false;
     isPausedRef.current = false;
     setCurrentGlobalIndex(0);
     setState(s => ({ ...s, isPlaying: false, isPaused: false }));
   }, [stopFallbackTimer]);
 
-  // Queue all chunks starting from target index
-  const queueChunks = useCallback((startIndex: number) => {
-    if (!synth.current) return;
-    
-    stopFallbackTimer();
-    activeUtteranceKeeper.clear();
-    
-    const chunks = chunksRef.current;
-    
-    // Resume if paused to make sure queue plays
-    if (synth.current.paused) {
-      synth.current.resume();
-    }
-    
-    for (let i = startIndex; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const chunkText = chunk.text.trim();
-      if (!chunkText) continue;
-      
-      const u = new SpeechSynthesisUtterance(chunk.text);
-      u.rate = rateRef.current;
-      u.pitch = pitchRef.current;
-      u.volume = state.volume ?? 1.0;
-      u.lang = 'pt-BR';
-      
-      if (voiceURIRef.current) {
-        const allVoices = synth.current.getVoices();
-        const matchedVoice = allVoices.find(v => v.voiceURI === voiceURIRef.current);
-        if (matchedVoice) {
-          u.voice = matchedVoice;
-          u.lang = matchedVoice.lang || 'pt-BR';
-        }
-      }
-      
-      // Bind index i via closure
-      u.onstart = () => {
-        currentChunkIndexRef.current = i;
-        setCurrentGlobalIndex(chunk.start);
-        boundaryFiredRecentlyRef.current = false;
-        chunkStartTimeRef.current = Date.now();
-        
-        // Start fallback interpolation timer for this specific chunk
-        stopFallbackTimer();
-        fallbackTimerRef.current = setInterval(() => {
-          if (!isPlayingRef.current || isPausedRef.current) return;
-          if (!boundaryFiredRecentlyRef.current) {
-            const elapsedSec = (Date.now() - chunkStartTimeRef.current) / 1000;
-            const estimatedChars = Math.floor(elapsedSec * 16 * rateRef.current);
-            const interpolatedIndex = Math.min(chunk.end, chunk.start + estimatedChars);
-            setCurrentGlobalIndex(interpolatedIndex);
-          }
-        }, 120);
-      };
-      
-      u.onboundary = (e) => {
-        boundaryFiredRecentlyRef.current = true;
-        const calculatedIndex = chunk.start + e.charIndex;
-        setCurrentGlobalIndex(calculatedIndex);
-      };
-      
-      u.onend = () => {
-        stopFallbackTimer();
-        activeUtteranceKeeper.delete(u);
-        
-        // If this is the last chunk, call onComplete
-        if (i === chunks.length - 1) {
-          stop();
-          if (onCompleteRef.current) {
-            onCompleteRef.current();
-          }
-        }
-      };
-      
-      u.onerror = (e) => {
-        stopFallbackTimer();
-        activeUtteranceKeeper.delete(u);
-        if (e.error !== 'canceled' && e.error !== 'interrupted') {
-          console.warn('SpeechSynthesis error in queued chunk:', e.error);
-          if (i === chunks.length - 1) {
-            stop();
-            if (onCompleteRef.current) {
-              onCompleteRef.current();
-            }
-          }
-        }
-      };
-      
-      activeUtteranceKeeper.add(u);
-      synth.current.speak(u);
-    }
-  }, [stopFallbackTimer, stop, state.volume]);
-
   const play = useCallback((text: string, startOffset = 0, onComplete?: () => void) => {
     if (!text || !text.trim()) return;
+
+    stopFallbackTimer();
+    activeUtteranceKeeper.clear();
 
     if (synth.current) {
       synth.current.cancel();
@@ -339,33 +249,82 @@ export function useSmartTTS() {
     isPausedRef.current = false;
 
     setState(s => ({ ...s, isPlaying: true, isPaused: false }));
+    setCurrentGlobalIndex(startOffset);
 
-    // Segment text
-    const chunks = splitTextIntoChunks(text);
-    chunksRef.current = chunks;
+    const remainingText = text.slice(startOffset);
+    if (!remainingText.trim()) {
+      stop();
+      if (onComplete) onComplete();
+      return;
+    }
 
-    // Find appropriate start chunk
-    let targetChunkIndex = 0;
-    if (startOffset > 0) {
-      const idx = chunks.findIndex(c => startOffset >= c.start && startOffset < c.end);
-      if (idx !== -1) {
-        targetChunkIndex = idx;
-      } else {
-        // Find closest preceding chunk
-        for (let i = chunks.length - 1; i >= 0; i--) {
-          if (chunks[i].start <= startOffset) {
-            targetChunkIndex = i;
-            break;
-          }
-        }
+    const u = new SpeechSynthesisUtterance(remainingText);
+    u.rate = rateRef.current;
+    u.pitch = pitchRef.current;
+    u.volume = state.volume ?? 1.0;
+    u.lang = 'pt-BR';
+
+    if (voiceURIRef.current) {
+      const allVoices = synth.current.getVoices();
+      const matchedVoice = allVoices.find(v => v.voiceURI === voiceURIRef.current);
+      if (matchedVoice) {
+        u.voice = matchedVoice;
+        u.lang = matchedVoice.lang || 'pt-BR';
       }
     }
 
-    currentChunkIndexRef.current = targetChunkIndex;
-    setCurrentGlobalIndex(startOffset);
+    boundaryFiredRecentlyRef.current = false;
+    chunkStartTimeRef.current = Date.now();
 
-    queueChunks(targetChunkIndex);
-  }, [queueChunks]);
+    u.onstart = () => {
+      // Start fallback interpolation timer
+      stopFallbackTimer();
+      fallbackTimerRef.current = setInterval(() => {
+        if (!isPlayingRef.current || isPausedRef.current) return;
+        if (!boundaryFiredRecentlyRef.current) {
+          const elapsedSec = (Date.now() - chunkStartTimeRef.current) / 1000;
+          const estimatedChars = Math.floor(elapsedSec * 16 * rateRef.current);
+          const interpolatedIndex = Math.min(text.length, startOffset + estimatedChars);
+          setCurrentGlobalIndex(interpolatedIndex);
+        }
+      }, 120);
+    };
+
+    u.onboundary = (e) => {
+      boundaryFiredRecentlyRef.current = true;
+      const calculatedIndex = startOffset + e.charIndex;
+      setCurrentGlobalIndex(calculatedIndex);
+    };
+
+    u.onend = () => {
+      stopFallbackTimer();
+      activeUtteranceKeeper.delete(u);
+      stop();
+      if (onCompleteRef.current) {
+        onCompleteRef.current();
+      }
+    };
+
+    u.onerror = (e) => {
+      stopFallbackTimer();
+      activeUtteranceKeeper.delete(u);
+      if (e.error !== 'canceled' && e.error !== 'interrupted') {
+        console.warn('SpeechSynthesis error:', e.error);
+        stop();
+        if (onCompleteRef.current) {
+          onCompleteRef.current();
+        }
+      }
+    };
+
+    activeUtteranceKeeper.add(u);
+    
+    if (synth.current.paused) {
+      synth.current.resume();
+    }
+    
+    synth.current.speak(u);
+  }, [stopFallbackTimer, stop, state.volume]);
 
   const pause = useCallback(() => {
     stopFallbackTimer();
@@ -385,9 +344,9 @@ export function useSmartTTS() {
       isPausedRef.current = false;
       isPlayingRef.current = true;
       setState(s => ({ ...s, isPlaying: true, isPaused: false }));
-      queueChunks(currentChunkIndexRef.current);
+      play(fullTextRef.current, currentGlobalIndex, onCompleteRef.current);
     }
-  }, [queueChunks]);
+  }, [play, currentGlobalIndex]);
 
   const skip = useCallback((charOffset: number) => {
     if (!fullTextRef.current) return;
