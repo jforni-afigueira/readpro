@@ -75,6 +75,7 @@ export const EpubViewer: React.FC<EpubViewerProps> = ({
 
   const currentPageRef = useRef(currentPage);
   const totalChaptersRef = useRef(chapters.length);
+  const chaptersRef = useRef(chapters);
   const onPageChangeRef = useRef(onPageChange);
   const autoPlayNextRef = useRef(false);
   const ttsPlayRef = useRef(tts.play);
@@ -82,6 +83,7 @@ export const EpubViewer: React.FC<EpubViewerProps> = ({
   useEffect(() => {
     currentPageRef.current = currentPage;
     totalChaptersRef.current = chapters.length;
+    chaptersRef.current = chapters;
     onPageChangeRef.current = onPageChange;
     ttsPlayRef.current = tts.play;
   }, [currentPage, chapters.length, onPageChange, tts.play]);
@@ -313,12 +315,33 @@ export const EpubViewer: React.FC<EpubViewerProps> = ({
   const currentChapterIndex = Math.max(0, Math.min((currentPage || 1) - 1, Math.max(0, chapters.length - 1)));
   const currentChapter = chapters[currentChapterIndex];
 
-  const handleChapterComplete = useCallback(() => {
-    if (currentPageRef.current < totalChaptersRef.current) {
-      autoPlayNextRef.current = true;
-      onPageChangeRef.current?.(currentPageRef.current + 1, totalChaptersRef.current);
+  const handleChapterComplete = useCallback(async () => {
+    const curr = currentPageRef.current;
+    const total = totalChaptersRef.current;
+
+    if (curr < total) {
+        const nextPage = curr + 1;
+        autoPlayNextRef.current = true;
+        onPageChangeRef.current?.(nextPage, total);
+
+        try {
+          const nextChapter = chaptersRef.current[nextPage - 1];
+          if (nextChapter) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(nextChapter.htmlContent, 'text/html');
+            const text = doc.body.textContent || "";
+            
+            if (text.trim()) {
+              tts.play(text, 0, handleChapterComplete);
+            }
+          }
+        } catch (e) {
+          console.error("Error autoplaying next chapter:", e);
+        }
+    } else {
+        autoPlayNextRef.current = false;
     }
-  }, []);
+  }, [tts]);
 
   // 2. Tokenize DOM and prepare text with clean paragraph markers (\n\n)
   useEffect(() => {
@@ -430,14 +453,6 @@ export const EpubViewer: React.FC<EpubViewerProps> = ({
       contentContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    if (autoPlayNextRef.current) {
-      autoPlayNextRef.current = false;
-      setTimeout(() => {
-        if (accumulatedText.trim()) {
-          ttsPlayRef.current(accumulatedText, 0, handleChapterComplete);
-        }
-      }, 150);
-    }
   }, [currentChapter, handleChapterComplete]);
 
   // Dynamic Theme Highlight Classes Helper

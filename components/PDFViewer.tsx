@@ -58,6 +58,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
   const onPageChangeRef = useRef(onPageChange);
   const currentPageRef = useRef(currentPage);
   const numPagesRef = useRef(numPages);
+  const pdfDocRef = useRef(pdfDoc);
+  
+  useEffect(() => {
+    pdfDocRef.current = pdfDoc;
+  }, [pdfDoc]);
   
   const lastScrolledElementRef = useRef<HTMLElement | null>(null);
   const lastPageRef = useRef<number | null>(null);
@@ -98,29 +103,56 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     loadPdf();
   }, [file]);
 
-  const handlePageComplete = useCallback(() => {
+  const handlePageComplete = useCallback(async () => {
     const curr = currentPageRef.current;
     const total = numPagesRef.current;
 
     if (curr < total) {
-       const nextPage = curr + 1;
-       autoPlayPageRef.current = nextPage;
-       onPageChangeRef.current(nextPage, total);
-    } else {
-       autoPlayPageRef.current = null;
-    }
-  }, []);
+        const nextPage = curr + 1;
+        autoPlayPageRef.current = nextPage;
+        onPageChangeRef.current(nextPage, total);
 
-  // 2. Render Page & Handle Autoplay
+        try {
+          if (!pdfDocRef.current) return;
+          const page = await pdfDocRef.current.getPage(nextPage);
+          const textContent = await page.getTextContent();
+          
+          let text = "";
+          let lastTop = -1;
+          let lastHeight = 16;
+          
+          textContent.items.forEach((item: any) => {
+            const str = item.str || "";
+            const transform = item.transform;
+            if (transform && transform.length >= 6) {
+              const top = transform[5];
+              const height = transform[3] || 16;
+              if (lastTop > 0 && top - lastTop > height * 1.6) {
+                if (text.length > 0 && !text.endsWith('\n\n')) {
+                  text += '\n\n';
+                }
+              }
+              lastTop = top;
+              lastHeight = height;
+            }
+            text += str + " ";
+          });
+          
+          if (text.trim()) {
+            tts.play(text, 0, handlePageComplete);
+          }
+        } catch (e) {
+          console.error("Error autoplaying next page:", e);
+        }
+    } else {
+        autoPlayPageRef.current = null;
+    }
+  }, [tts]);
+
+  // 2. Render Page
   useEffect(() => {
     if (!pdfDoc || !containerRef.current) return;
     
-    const isAutoPlayAdvance = autoPlayPageRef.current === currentPage;
-    const isManualOrExisting = tts.state.isPlaying;
-    const shouldPlay = isAutoPlayAdvance || isManualOrExisting;
-    
-    const pageChanged = lastPageRef.current !== currentPage;
-
     let isCancelled = false;
 
     const renderPage = async () => {
@@ -128,12 +160,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       isRenderingRef.current = true;
 
       try {
-        if (pageChanged) {
-          if (tts.state.isPlaying && !isAutoPlayAdvance) {
-            tts.stop();
-          }
-        }
-
         const page = await pdfDoc.getPage(currentPage);
         const viewport = page.getViewport({ scale: scale });
         
@@ -154,19 +180,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         
-        // Theme filter for Canvas
         if (theme === 'dark') {
           canvas.style.filter = 'invert(0.88) hue-rotate(180deg) contrast(0.92)';
         } else if (theme === 'sepia') {
-          canvas.style.filter = 'sepia(0.28) contrast(0.96) brightness(0.98)';
+          canvas.style.filter = 'sepia(0.35) contrast(0.95)';
         } else {
           canvas.style.filter = 'none';
         }
 
         pageWrapper.appendChild(canvas);
-        
-        await page.render({ canvasContext: ctx!, viewport }).promise;
 
+        const renderContext = {
+          canvasContext: ctx!,
+          viewport: viewport
+        };
+        await page.render(renderContext).promise;
         if (isCancelled) return;
 
         // Highlight Layer (Subtle, theme-aware tint)
@@ -200,7 +228,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           textDivs: []
         }).promise;
 
-        // Text Extraction with paragraph breaks
+        // Text Extraction
         const spans = Array.from(textDiv.querySelectorAll('span')) as HTMLElement[];
         let accumulatedText = "";
         const mapItems: TextMapItem[] = [];
@@ -212,61 +240,64 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           const content = span.textContent || "";
           const rect = span.getBoundingClientRect();
 
-          // If there's a significant vertical gap indicating a new paragraph, add \n\n
           if (lastTop > 0 && rect.top - lastTop > lastHeight * 1.6) {
             if (accumulatedText.length > 0 && !accumulatedText.endsWith('\n\n')) {
               accumulatedText += '\n\n';
             }
           }
 
-          const suffix = (content.endsWith(' ') || content.endsWith('-')) ? '' : ' ';
-          const fullSegment = content + suffix;
+          const start = accumulatedText.length;
+          accumulatedText += content + " ";
+          const end = accumulatedText.length;
 
           mapItems.push({
-            start: accumulatedText.length,
-            end: accumulatedText.length + fullSegment.length, 
+            start,
+            end,
             element: span
           });
-          
-          accumulatedText += fullSegment;
+
           lastTop = rect.top;
-          if (rect.height > 0) lastHeight = rect.height;
+          lastHeight = rect.height || 16;
         });
 
-        // Line Grouping for Highlight
+        // Group tokens into line regions
         const groups: LineRegion[] = [];
         if (mapItems.length > 0) {
-            const wrapperRect = pageWrapper.getBoundingClientRect();
-            let currentGroup = [mapItems[0]];
-
-            const finalizeGroup = (items: TextMapItem[]) => {
-                let minTop = Infinity, maxBottom = -Infinity; 
-                let minLeft = Infinity, maxRight = -Infinity;
-
-                items.forEach(it => {
-                   const r = it.element.getBoundingClientRect();
-                   const top = r.top - wrapperRect.top;
-                   const bottom = r.bottom - wrapperRect.top;
-                   const left = r.left - wrapperRect.left;
-                   const right = r.right - wrapperRect.left;
-
-                   if (top < minTop) minTop = top;
-                   if (bottom > maxBottom) maxBottom = bottom;
-                   if (left < minLeft) minLeft = left;
-                   if (right > maxRight) maxRight = right;
+            let currentGroup: TextMapItem[] = [mapItems[0]];
+            
+            const finalizeGroup = (group: TextMapItem[]) => {
+                if (group.length === 0) return;
+                const startIdx = group[0].start;
+                const endIdx = group[group.length - 1].end;
+                
+                let minL = Infinity;
+                let minT = Infinity;
+                let maxR = -Infinity;
+                let maxB = -Infinity;
+                
+                group.forEach(it => {
+                    const el = it.element;
+                    const r = el.getBoundingClientRect();
+                    const pageRect = pageWrapper.getBoundingClientRect();
+                    const l = r.left - pageRect.left;
+                    const t = r.top - pageRect.top;
+                    const right = l + r.width;
+                    const b = t + r.height;
+                    
+                    if (l < minL) minL = l;
+                    if (t < minT) minT = t;
+                    if (right > maxR) maxR = right;
+                    if (b > maxB) maxB = b;
                 });
-
-                const V_PAD = 2 * (scale / 1.5);
-                const H_PAD = 4 * (scale / 1.5);
-
+                
                 groups.push({
-                    start: items[0].start,
-                    end: items[items.length - 1].end,
+                    start: startIdx,
+                    end: endIdx,
                     rect: {
-                        top: minTop - V_PAD,
-                        left: minLeft - H_PAD,
-                        width: (maxRight - minLeft) + (H_PAD * 2),
-                        height: (maxBottom - minTop) + (V_PAD * 2)
+                        top: minT - 1,
+                        left: minL - 2,
+                        width: (maxR - minL) + 4,
+                        height: (maxB - minT) + 2
                     }
                 });
             };
@@ -308,19 +339,6 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           }
         });
         
-        // Trigger Autoplay
-        if (shouldPlay && pageChanged) {
-           setTimeout(() => {
-             if (currentPage === currentPageRef.current && !isCancelled) {
-                if (autoPlayPageRef.current === currentPage) {
-                    autoPlayPageRef.current = null;
-                }
-                
-                tts.play(accumulatedText, 0, handlePageComplete);
-             }
-           }, 100);
-        }
-
         lastPageRef.current = currentPage;
 
       } catch (err) {

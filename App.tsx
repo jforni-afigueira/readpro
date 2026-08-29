@@ -207,14 +207,18 @@ const App: React.FC = () => {
   // Robust Page Jump that respects boundaries
   const handlePageJump = useCallback((page: number) => {
     if (totalPages === 0 && page === 1) {
+       tts.stop();
        setCurrentPage(1);
        return;
     }
     if (totalPages > 0) {
       const target = Math.max(1, Math.min(page, totalPages));
-      setCurrentPage(target);
+      if (target !== currentPage) {
+        tts.stop();
+        setCurrentPage(target);
+      }
     }
-  }, [totalPages]);
+  }, [totalPages, currentPage, tts]);
 
   const handleGlobalDoubleClick = useCallback((e: React.MouseEvent) => {
     // Prevent mouse double clicks synthesized from double taps on mobile

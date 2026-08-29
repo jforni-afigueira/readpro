@@ -239,7 +239,7 @@ export function useSmartTTS() {
     stopFallbackTimer();
     activeUtteranceKeeper.clear();
 
-    if (synth.current) {
+    if (synth.current && synth.current.speaking) {
       synth.current.cancel();
     }
 
