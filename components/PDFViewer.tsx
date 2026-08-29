@@ -45,6 +45,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     translate: { x: 0, y: 0 },
     startX: 0,
     startY: 0,
+    lastY: 0,
     startDist: 0,
     startScale: 1,
     startTranslate: { x: 0, y: 0 },
@@ -285,6 +286,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         setPageText(accumulatedText);
         setTextMap(mapItems);
         setLineRegions(groups);
+
+        // Text Layer Click Handler to start narrating from clicked sentence beginning
+        textDiv.addEventListener('click', (e) => {
+          const target = e.target as HTMLElement;
+          if (target && target.tagName === 'SPAN') {
+            const item = mapItems.find(it => it.element === target);
+            if (item) {
+              const sentenceStartIdx = findSentenceStart(accumulatedText, item.start);
+              tts.play(accumulatedText, sentenceStartIdx, handlePageComplete);
+            }
+          }
+        });
         
         // Trigger Autoplay
         if (shouldPlay) {
@@ -354,10 +367,11 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     const state = touchStateRef.current;
     
     if (e.touches.length === 1) {
-      // Single touch = Panning
+      // Single touch = Panning / Window scrolling
       const touch = e.touches[0];
       state.startX = touch.clientX;
       state.startY = touch.clientY;
+      state.lastY = touch.clientY; // Track last touch position for scrolling delta
       state.startTranslate = { ...state.translate };
       state.isPanning = true;
       state.isPinching = false;
@@ -393,14 +407,22 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
       
       if (state.scale > 1) {
         if (e.cancelable) e.preventDefault();
+        state.translate = {
+          x: state.startTranslate.x + dx / state.scale,
+          y: state.startTranslate.y + dy / state.scale
+        };
+        setLocalTranslate({ ...state.translate });
+      } else {
+        // When not zoomed in, vertical drag scrolls the browser viewport manually
+        // since we use touch-action: none to block default browser zooming.
+        if (state.lastY !== undefined) {
+          const deltaY = state.lastY - touch.clientY;
+          state.lastY = touch.clientY;
+          if (deltaY !== 0) {
+            window.scrollBy(0, deltaY);
+          }
+        }
       }
-      
-      state.translate = {
-        x: state.startTranslate.x + dx / state.scale,
-        y: state.startTranslate.y + dy / state.scale
-      };
-      
-      setLocalTranslate({ ...state.translate });
     } else if (state.isPinching && e.touches.length === 2) {
       if (e.cancelable) e.preventDefault();
       
@@ -476,7 +498,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
           transform: `scale(${localScale}) translate(${localTranslate.x}px, ${localTranslate.y}px)`,
           transformOrigin: 'center center',
           transition: isGestureActive ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-          touchAction: localScale > 1 ? 'none' : 'pan-y',
+          touchAction: 'none',
           cursor: isGestureActive ? 'grabbing' : 'grab'
         } as React.CSSProperties}
         onTouchStart={handleTouchStartWithDoubleTap}
@@ -488,3 +510,20 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
     </div>
   );
 };
+
+function findSentenceStart(text: string, index: number): number {
+  if (index <= 0) return 0;
+  let pos = index - 1;
+  while (pos >= 0) {
+    const char = text[pos];
+    if (/[.!?\n]/.test(char)) {
+      let start = pos + 1;
+      while (start < index && /\s/.test(text[start])) {
+        start++;
+      }
+      return start;
+    }
+    pos--;
+  }
+  return 0;
+}

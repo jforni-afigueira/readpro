@@ -76,6 +76,7 @@ const App: React.FC = () => {
   const [historyToast, setHistoryToast] = useState<string | null>(null);
   const historyToastTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastTouchTimeRef = useRef(0);
 
   const tts = useSmartTTS();
 
@@ -213,6 +214,73 @@ const App: React.FC = () => {
       setCurrentPage(target);
     }
   }, [totalPages]);
+
+  const handleGlobalDoubleClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') || 
+      target.closest('input') || 
+      target.closest('a') || 
+      target.closest('select') || 
+      target.closest('footer') || 
+      target.closest('.no-double-click')
+    ) {
+      return;
+    }
+
+    const screenWidth = window.innerWidth;
+    const clickX = e.clientX;
+    const sideWidth = screenWidth * 0.15;
+
+    if (clickX < sideWidth) {
+      e.preventDefault();
+      handlePageJump(currentPage - 1);
+      showToast("Página Anterior");
+    } else if (clickX > screenWidth - sideWidth) {
+      e.preventDefault();
+      handlePageJump(currentPage + 1);
+      showToast("Próxima Página");
+    }
+  }, [currentPage, handlePageJump, showToast]);
+
+  const handleGlobalTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    
+    const now = Date.now();
+    const delay = now - lastTouchTimeRef.current;
+    
+    if (delay > 0 && delay < 300) {
+      const touch = e.touches[0];
+      const screenWidth = window.innerWidth;
+      const clickX = touch.clientX;
+      const sideWidth = screenWidth * 0.15;
+      
+      const target = e.target as HTMLElement;
+      if (
+        target.closest('button') || 
+        target.closest('input') || 
+        target.closest('a') || 
+        target.closest('select') || 
+        target.closest('footer') || 
+        target.closest('.no-double-click')
+      ) {
+        return;
+      }
+      
+      if (clickX < sideWidth) {
+        if (e.cancelable) e.preventDefault();
+        handlePageJump(currentPage - 1);
+        showToast("Página Anterior");
+      } else if (clickX > screenWidth - sideWidth) {
+        if (e.cancelable) e.preventDefault();
+        handlePageJump(currentPage + 1);
+        showToast("Próxima Página");
+      }
+      lastTouchTimeRef.current = 0;
+    } else {
+      lastTouchTimeRef.current = now;
+    }
+  }, [currentPage, handlePageJump, showToast]);
 
   const togglePlay = useCallback(() => {
     if (tts.state.isPlaying && !tts.state.isPaused) {
@@ -361,13 +429,17 @@ const App: React.FC = () => {
   });
 
   return (
-    <div className={`h-screen w-full flex flex-col font-sans overflow-hidden transition-colors duration-200 ${
-      theme === 'dark' 
-        ? 'bg-[#0f1115] text-[#d8dce6]' 
-        : theme === 'sepia'
-        ? 'bg-[#ede0c8] text-[#3d2e1e]'
-        : 'bg-slate-50 text-slate-900'
-    }`}>
+    <div 
+      onDoubleClick={handleGlobalDoubleClick}
+      onTouchStart={handleGlobalTouchStart}
+      className={`h-screen w-full flex flex-col font-sans overflow-hidden transition-colors duration-200 ${
+        theme === 'dark' 
+          ? 'bg-[#0f1115] text-[#d8dce6]' 
+          : theme === 'sepia'
+          ? 'bg-[#ede0c8] text-[#3d2e1e]'
+          : 'bg-slate-50 text-slate-900'
+      }`}
+    >
       {/* Hidden Global File Input for Shortcuts & Handlers */}
       <input 
         type="file" 

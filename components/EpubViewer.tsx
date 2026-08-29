@@ -405,7 +405,8 @@ export const EpubViewer: React.FC<EpubViewerProps> = ({
           // Click-to-narrate from this exact word
           span.addEventListener('click', (e) => {
             e.stopPropagation();
-            ttsPlayRef.current(accumulatedText, start, handleChapterComplete);
+            const sentenceStartIdx = findSentenceStart(accumulatedText, start);
+            ttsPlayRef.current(accumulatedText, sentenceStartIdx, handleChapterComplete);
           });
 
           tokens.push({
@@ -753,3 +754,20 @@ export const EpubViewer: React.FC<EpubViewerProps> = ({
     </div>
   );
 };
+
+function findSentenceStart(text: string, index: number): number {
+  if (index <= 0) return 0;
+  let pos = index - 1;
+  while (pos >= 0) {
+    const char = text[pos];
+    if (/[.!?\n]/.test(char)) {
+      let start = pos + 1;
+      while (start < index && /\s/.test(text[start])) {
+        start++;
+      }
+      return start;
+    }
+    pos--;
+  }
+  return 0;
+}

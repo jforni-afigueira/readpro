@@ -529,6 +529,45 @@ export const TTSSettingsModal: React.FC<TTSSettingsModalProps> = ({
             </div>
           </div>
 
+          {/* Section 4: Voice Commands Reference */}
+          <div className={`rounded-2xl p-4 border transition-colors ${
+            isDark 
+              ? 'bg-[#20232a] border-slate-800' 
+              : isSepia 
+              ? 'bg-[#ebd8b7] border-[#dcc59f]' 
+              : 'bg-slate-50/80 border-slate-100'
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Mic size={16} className={isDark ? 'text-indigo-400' : isSepia ? 'text-[#8c6536]' : 'text-indigo-600'} />
+              <h3 className={`text-sm font-bold ${
+                isDark ? 'text-slate-200' : isSepia ? 'text-[#382613]' : 'text-slate-800'
+              }`}>
+                Comandos de Voz Disponíveis
+              </h3>
+            </div>
+            
+            <p className={`text-xs mb-3 ${
+              isDark ? 'text-slate-400' : isSepia ? 'text-[#735c44]' : 'text-slate-500'
+            }`}>
+              Fale estes comandos após ativar a interação por voz (ícone de microfone):
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs leading-relaxed">
+              <div className="space-y-1.5">
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Leitura:</strong> "Ler", "Pausar", "Parar"</div>
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Páginas:</strong> "Próxima", "Anterior", "Página [Nº]"</div>
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Velocidade:</strong> "Aumentar/Diminuir velocidade"</div>
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Temas:</strong> "Modo claro", "Modo sépia", "Modo escuro"</div>
+              </div>
+              <div className="space-y-1.5">
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Zoom (PDF):</strong> "Aumentar/Diminuir zoom", "Ajustar tela"</div>
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Tamanho (EPUB):</strong> "Aumentar/Diminuir fonte"</div>
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Marcadores:</strong> "Marcar página", "Abrir marcadores"</div>
+                <div>🗣️ <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>Painéis:</strong> "Abrir histórico", "Tela cheia", "Recolher barra"</div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {/* Footer Actions */}
